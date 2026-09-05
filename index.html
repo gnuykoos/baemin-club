@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏸 배드민턴의 민족 🏸</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-100 min-h-screen p-4 font-sans text-slate-800 flex justify-center items-center">
+
+  <div class="w-full max-w-md mx-auto">
+
+    <!-- 1. 표지 (로그인) 화면 -->
+    <div id="landingPage" class="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 flex flex-col">
+      <div class="relative h-56 bg-indigo-600 overflow-hidden flex items-center justify-center">
+        <img src="baemin.jpg" alt="동아리 사진" class="w-full h-full object-cover opacity-90"/>
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent"></div>
+        <div class="absolute bottom-4 left-5 text-white">
+          <span class="bg-indigo-500/80 backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Badminton Club</span>
+          <h1 class="text-2xl font-black mt-1">🏸 배드민턴의 민족 🏸</h1>
+        </div>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">로그인</h2>
+          <p class="text-xs text-slate-500 mt-0.5">등록된 이름과 Neptun 코드를 입력하세요 (대소문자 구분 없음).</p>
+        </div>
+
+        <div class="space-y-3 pt-2">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">이름</label>
+            <input type="text" id="inputName" placeholder="EX. 김배민" class="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white p-3 rounded-xl text-sm font-semibold outline-none transition">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Neptun 코드</label>
+            <input type="text" id="inputStudentId" placeholder="ex. A1B2C3" class="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white p-3 rounded-xl text-sm font-semibold outline-none transition uppercase">
+          </div>
+
+          <button type="button" id="startBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-indigo-200 mt-2 flex items-center justify-center gap-2">
+            <span>접속하기 ➔</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 메인 신청 화면 -->
+    <div id="mainPage" class="hidden space-y-4">
+      <header class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h1 id="userGreeting" class="text-lg font-extrabold text-slate-900">...님</h1>
+            <span id="roleBadge" class="hidden bg-indigo-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full">관리자</span>
+          </div>
+          <p id="userStudentId" class="text-xs text-slate-500">Neptun 코드: -</p>
+        </div>
+        <span id="weekBadge" class="bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full">10주차</span>
+      </header>
+
+      <!-- 회장단 전용: 신청 오픈 & 초보 세션 원클릭 제어판 -->
+      <div id="adminOpenControl" class="hidden bg-indigo-50 p-4 rounded-2xl border border-indigo-200 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black text-indigo-950 flex items-center gap-1">⚙️ 세션 신청 오픈 제어 (회장단 전용)</span>
+          <span id="adminStatusTag" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">신청 닫힘</span>
+        </div>
+        
+        <!-- 신청 오픈/닫기 버튼 -->
+        <div class="flex gap-2">
+          <button onclick="toggleSessionOpen(true)" class="flex-1 py-2 rounded-xl text-xs font-extrabold transition bg-indigo-600 text-white shadow-sm hover:bg-indigo-700">
+            🟢 지금 오픈하기
+          </button>
+          <button onclick="toggleSessionOpen(false)" class="flex-1 py-2 rounded-xl text-xs font-extrabold transition bg-slate-200 text-slate-700 hover:bg-slate-300">
+            🔴 신청 닫기/마감
+          </button>
+        </div>
+
+        <!-- 초보 세션 설정 영역 (수동 토글 + 수동 일괄 전환) -->
+        <div class="bg-white p-3 rounded-xl border border-indigo-100 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800">🐣 이번 주 초보 강습 세션 (40분)</span>
+            <button onclick="toggleLessonWeek()" id="btnToggleLesson" class="text-[11px] font-bold px-2.5 py-1 rounded-lg border transition bg-slate-100 text-slate-600 border-slate-200">
+              비활성화 상태
+            </button>
+          </div>
+          <p class="text-[10px] text-slate-400 leading-tight">수요일 21:30에 코치 미지원 시 자동 전환되며, 아래 버튼으로 지금 즉시 수동 전환도 가능합니다.</p>
+          <button onclick="mergeToNormalSession()" class="w-full bg-amber-50 hover:bg-amber-100 active:scale-98 text-amber-800 border border-amber-200 text-[11px] font-bold py-2 rounded-lg transition flex items-center justify-center gap-1">
+            <span>⚡ 코치 미지원 시: 지금 즉시 일반 세션으로 전환</span>
+          </button>
+        </div>
+
+        <!-- 안내 문구 수정창 -->
+        <div class="flex gap-1.5">
+          <input type="text" id="adminNoticeInput" placeholder="부원들에게 보여줄 안내 문구 (예: 목요일 오픈 예정)" class="flex-1 bg-white border border-indigo-200 text-xs p-2 rounded-xl outline-none text-slate-800">
+          <button onclick="saveNoticeMessage()" class="bg-indigo-900 text-white text-xs font-bold px-3 rounded-xl hover:bg-indigo-800">저장</button>
+        </div>
+      </div>
+
+      <!-- 2등분 버튼 섹션 (공지사항 / 출석 현황) -->
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="openNoticeModal()" class="w-full bg-amber-50 hover:bg-amber-100 active:scale-98 text-amber-800 text-xs font-bold py-3 rounded-xl border border-amber-200 transition flex items-center justify-center gap-1 shadow-sm">
+          <span>📢 동아리 공지사항</span>
+        </button>
+        <button onclick="goToAttendancePage()" class="w-full bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-700 text-xs font-bold py-3 rounded-xl border border-slate-200 transition flex items-center justify-center gap-1 shadow-sm">
+          <span>📊 출석 현황 보기 ➔</span>
+        </button>
+      </div>
+
+      <!-- 세션 신청 섹션 -->
+      <section class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+        <div class="flex justify-between items-center mb-1">
+          <h2 class="font-bold text-base text-slate-900">금요일 정기 세션 선착순 신청</h2>
+        </div>
+        <p id="timeNoticeText" class="text-xs text-slate-500 mb-3">코트 예약 확인 후 공지와 함께 오픈됩니다.</p>
+        
+        <!-- 초보 강습 주간 알림 배너 -->
+        <div id="lessonBanner" class="hidden bg-amber-50 border border-amber-200 p-3 rounded-xl mb-3 text-xs text-amber-900 space-y-1">
+          <p class="font-bold flex items-center gap-1"><span>🐣</span> 이번 주는 초보 강습(40분) 진행 주간입니다!</p>
+          <p class="text-[11px] text-amber-700 leading-snug">초반 40분간 1개 코트에서 코치 1명 + 초보 3명 레슨 진행 후 정상 게임 진행 (수요일 21:30까지 코치 미지원 시 전원 일반 세션 진행)</p>
+        </div>
+
+        <!-- 신청 유형 선택 라디오 (초보 강습 주간에만 노출) -->
+        <div id="typeSelectorBox" class="hidden bg-slate-50 border border-slate-200 p-3 rounded-xl mb-3 space-y-2 text-xs">
+          <p class="font-bold text-slate-700">신청 유형을 선택해 주세요:</p>
+          <div class="space-y-1.5">
+            <label class="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 cursor-pointer hover:border-indigo-400">
+              <div class="flex items-center gap-2">
+                <input type="radio" name="applyType" value="일반" checked class="accent-indigo-600">
+                <span class="font-bold text-slate-800">일반 게임 참석</span>
+              </div>
+              <span id="typeCountNormal" class="text-[11px] font-bold text-slate-400">0/10명</span>
+            </label>
+            <label class="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 cursor-pointer hover:border-indigo-400">
+              <div class="flex items-center gap-2">
+                <input type="radio" name="applyType" value="코치" class="accent-indigo-600">
+                <span class="font-bold text-indigo-700">일일 코치 지원</span>
+              </div>
+              <span id="typeCountCoach" class="text-[11px] font-bold text-indigo-600">0/1명</span>
+            </label>
+            <label class="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 cursor-pointer hover:border-indigo-400">
+              <div class="flex items-center gap-2">
+                <input type="radio" name="applyType" value="초보" class="accent-indigo-600">
+                <span class="font-bold text-amber-700">초보 강습 신청</span>
+              </div>
+              <span id="typeCountLesson" class="text-[11px] font-bold text-amber-600">0/3명</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex justify-between text-sm mb-2">
+          <span>확정 인원: <strong id="confirmedCount" class="text-indigo-600">0</strong> / 14명</span>
+          <span>대기 인원: <strong id="waitingCount" class="text-amber-600">0</strong>명</span>
+        </div>
+        
+        <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden mb-4">
+          <div id="progressBar" class="bg-indigo-600 h-full w-0 transition-all duration-300"></div>
+        </div>
+
+        <button id="applyBtn" onclick="applySession()" class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold py-3 rounded-xl transition shadow-md shadow-indigo-200 disabled:opacity-75 disabled:cursor-not-allowed disabled:active:scale-100">
+          신청하기
+        </button>
+      </section>
+
+      <section class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+        <h2 class="font-bold text-base mb-3 text-slate-900">현재 신청 명단</h2>
+        <div id="memberList" class="space-y-2"></div>
+      </section>
+
+      <button onclick="goToSettlementPage()" class="w-full bg-slate-900 hover:bg-slate-800 active:scale-98 text-white font-bold py-4 rounded-2xl transition shadow-lg flex items-center justify-center gap-2">
+        <span>이번 주 코트비 정산 보러 가기 <span class="text-indigo-400">➔</span></span>
+      </button>
+    </div>
+
+    <!-- 3. 정산 전용 페이지 -->
+    <div id="settlementPage" class="hidden space-y-4">
+      <div class="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+        <button onclick="goToMainPage()" class="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1">← 뒤로가기</button>
+        <h1 class="font-bold text-base text-slate-900">코트비 정산 현황</h1>
+        <span class="w-12"></span>
+      </div>
+
+      <div id="weekFilterContainer" class="hidden bg-indigo-50 p-3 rounded-2xl border border-indigo-100 flex justify-between items-center">
+        <span class="text-xs font-bold text-indigo-900">📅 주차별 내역 조회 (회장단 전용)</span>
+        <select id="weekSelect" onchange="changeWeekFilter(this.value)" class="bg-white border border-indigo-200 text-xs font-bold p-1.5 rounded-lg outline-none text-indigo-700">
+        </select>
+      </div>
+
+      <section class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+          <div class="flex justify-between items-center mb-1">
+            <label class="block text-xs font-bold text-slate-600">총 코트 대여비</label>
+            <span id="adminNotice" class="text-[10px] text-indigo-600 font-bold hidden">✏️ 회장/부회장 수정가능</span>
+          </div>
+          <input type="number" id="totalFeeInput" value="140000" oninput="updateFee()" class="w-full bg-white border border-slate-300 p-2.5 rounded-lg text-base font-extrabold text-slate-800 outline-none focus:border-indigo-500 disabled:bg-slate-100 disabled:text-slate-500">
+        </div>
+
+        <div class="bg-indigo-50 p-5 rounded-2xl text-center border border-indigo-100">
+          <p class="text-xs text-indigo-600 font-bold">1인당 입금 금액 (100원 단위 올림)</p>
+          <p id="feePerPerson" class="text-3xl font-black text-indigo-700 mt-1">0원</p>
+        </div>
+
+        <div class="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+          <p class="font-bold text-slate-800">🏦 입금 계좌번호</p>
+          <p class="text-slate-700">신한 <span class="font-bold text-indigo-600">110418001817</span> (최낙원)</p>
+        </div>
+      </section>
+
+      <section class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+        <h2 class="font-bold text-base mb-3 text-slate-900">참석 확정자 입금 현황</h2>
+        <div id="settlementMemberList" class="space-y-2"></div>
+      </section>
+    </div>
+
+    <!-- 4. 출석 현황 페이지 -->
+    <div id="attendancePage" class="hidden space-y-4">
+      <div class="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+        <button onclick="goToMainPage()" class="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1">← 뒤로가기</button>
+        <h1 class="font-bold text-base text-slate-900">부원 출석 현황판</h1>
+        <span class="w-12"></span>
+      </div>
+
+      <section class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+        <div class="flex justify-between items-center mb-1">
+          <h2 class="font-bold text-base text-slate-900">누적 출석 횟수</h2>
+          <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-semibold">내림차순 정렬</span>
+        </div>
+        <p class="text-xs text-slate-400 mb-4">학기당 2회 이상 참석 필수</p>
+
+        <div id="attendanceList" class="space-y-2"></div>
+      </section>
+    </div>
+
+  </div>
+
+  <!-- 5. 공지사항 모달 -->
+  <div id="noticeModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex justify-center items-center p-4 z-50">
+    <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-4 border border-slate-100">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <h3 class="font-extrabold text-base text-slate-900 flex items-center gap-1.5">
+          <span>🏸</span> 배민 이용 안내 및 규칙
+        </h3>
+        <button onclick="closeNoticeModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+      </div>
+      
+      <div class="space-y-3 text-xs text-slate-700 leading-relaxed max-h-[68vh] overflow-y-auto pr-1">
+        
+        <div class="bg-amber-50 p-3 rounded-2xl border border-amber-100 text-center">
+          <p class="font-extrabold text-amber-900">⭐ 싸우지 말고 즐겁게 칩시다! ⭐</p>
+          <p class="text-[11px] text-amber-700 mt-0.5">우리 모두 즐거운 배드민턴 치고 놀아요🤩</p>
+        </div>
+
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+          <p class="font-bold text-slate-800">📅 1. 모집 및 코트 예약</p>
+          <p>• 코트 예약 상황에 따라 공지와 함께 신청이 오픈됩니다.</p>
+          <p>• 신청 취소는 <strong class="text-rose-600">목요일 밤 9시 30분(21:30)까지</strong>만 웹에서 가능합니다.</p>
+          <p>• 모집 마감 후 <strong class="text-indigo-600">이틀 내 입금</strong> 부탁드립니다.</p>
+          <p>• 특수 사유 제외, <strong class="text-rose-600">당일 취소 시 환불 불가</strong>합니다. (최소 1일 전 연락 필수)</p>
+        </div>
+
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+          <p class="font-bold text-slate-800">🏸 2. 경기 방식 및 팀 구성</p>
+          <p>• 기본 <strong class="text-indigo-600">혼성 복식</strong> 으로 진행됩니다.</p>
+          <p>• 모임 <strong class="text-indigo-600">최소 2시간 전</strong> 랜덤 팀 공지 예정입니다.</p>
+          <p>• <strong class="text-indigo-600">20분 단위 x 6세트</strong> (총 2시간)로 모든 팀과 1회씩 경기합니다.</p>
+          <p>• 초보 강습 주간에는 초반 40분간 1코트에서 코치 레슨이 진행됩니다. (<strong class="text-rose-600">수요일 21:30까지 코치 미지원 시 일반 세션으로 자동 전환</strong>)</p>
+        </div>
+
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+          <p class="font-bold text-slate-800">📍 3. 코트 장소 및 라켓</p>
+          <p>• <strong class="text-indigo-600">BME 코트</strong> 최우선 예약 (불가 시 학교/ELTE 코트)</p>
+          <p class="text-indigo-600 font-semibold pl-2">➔ <a href="https://maps.app.goo.gl/ARTwn2F8KqVX6eSd9" target="_blank" class="underline">BME 코트 구글맵 위치 보기</a></p>
+          <p>• 개인 라켓 소지 추천 (BME 라켓 대여비: 500 Ft)</p>
+        </div>
+
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+          <p class="font-bold text-slate-800">💰 4. 회비 및 출석 규정</p>
+          <p>• 동아리 회비: <strong class="text-indigo-600">2,000 HUF</strong> (셔틀콕 구매 및 동아리운영용)</p>
+          <p>• 회비는 한화 입금이 원칙이며, 불가 시 미리 연락 부탁드립니다.</p>
+          <p>• 학기당 <strong class="text-indigo-600">의무 참석 2회</strong> 필수입니다.</p>
+        </div>
+
+        <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100 text-center">
+          <p class="font-bold text-indigo-900 text-[11px]">추가적인 건의사항, 질문 있으시면 언제든지 따로 연락주셔도 좋습니다!</p>
+        </div>
+
+      </div>
+
+      <button onclick="closeNoticeModal()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl text-xs transition">
+        확인했습니다
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://aswybiqljwzvydqrjaqu.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzd3liaXFsand6dnlkcXJqYXF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MjkwMzgsImV4cCI6MjEwMTEwNTAzOH0.TPdBPpgfCeLGdVtzaR9bVgRjmLETfQxT99uTGs29BY4";
+    
+    let supabaseClient = null;
+
+    function getSupabaseClient() {
+      if (!supabaseClient) {
+        if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
+          alert('Supabase 라이브러리가 로드되지 않았습니다. 인터넷 연결을 확인하고 새로고침 해주세요.');
+          return null;
+        }
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      }
+      return supabaseClient;
+    }
+
+    const startDate = new Date("2026-09-07T00:00:00");
+    const today = new Date();
+    const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+    const CURRENT_WEEK = Math.max(1, Math.floor(diffDays / 7) + 1);
+
+    let selectedWeek = CURRENT_WEEK;
+    let currentUser = { name: '', studentId: '', role: '부원' };
+    let registrations = [];
+    let clubSettings = { is_open: false, notice: '코트 예약 확인 후 공지와 함께 오픈됩니다.', is_lesson_week: false };
+    const MAX_CAPACITY = 14;
+
+    // 수요일 21:30 마감 시각 (초보 세션 코치 지원 마감)
+    function getWednesdayDeadline(weekNum) {
+      const mondayDate = new Date(startDate.getTime() + (weekNum - 1) * 7 * 24 * 60 * 60 * 1000);
+      const wednesday = new Date(mondayDate.getTime() + 2 * 24 * 60 * 60 * 1000);
+      wednesday.setHours(21, 30, 0, 0);
+      return wednesday;
+    }
+
+    // 목요일 21:30 마감 시각 (취소 마감)
+    function getWeekCancelDeadline(weekNum) {
+      const mondayDate = new Date(startDate.getTime() + (weekNum - 1) * 7 * 24 * 60 * 60 * 1000);
+      const thursdayDeadline = new Date(mondayDate.getTime() + 3 * 24 * 60 * 60 * 1000);
+      thursdayDeadline.setHours(21, 30, 0, 0);
+      return thursdayDeadline;
+    }
+
+    function isCancellationAllowed(weekNum) {
+      return new Date() <= getWeekCancelDeadline(weekNum);
+    }
+
+    document.getElementById("weekBadge").innerText = `${CURRENT_WEEK}주차`;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const startBtn = document.getElementById('startBtn');
+      if (startBtn) {
+        startBtn.addEventListener('click', handleStart);
+      }
+    });
+
+    function openNoticeModal() {
+      document.getElementById('noticeModal').classList.remove('hidden');
+    }
+
+    function closeNoticeModal() {
+      document.getElementById('noticeModal').classList.add('hidden');
+    }
+
+    async function handleStart() {
+      const name = document.getElementById('inputName').value.trim();
+      const studentId = document.getElementById('inputStudentId').value.trim();
+
+      if (!name || !studentId) {
+        alert('이름과 Neptun 코드를 모두 입력해 주세요!');
+        return;
+      }
+
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      try {
+        let { data: members, error: fetchError } = await client
+          .from('members')
+          .select('*')
+          .ilike('name', name)
+          .ilike('student_id', studentId);
+
+        if (fetchError) {
+          alert("⚠️ DB 연결 에러:\n" + fetchError.message);
+          return;
+        }
+
+        if (!members || members.length === 0) {
+          alert('등록되지 않은 부원 정보입니다.\n이름과 Neptun 코드를 다시 확인하거나 관리자에게 문의해 주세요.');
+          return;
+        }
+
+        currentUser = members[0];
+
+        const isAdmin = currentUser.role === '회장' || currentUser.role === '부회장';
+
+        document.getElementById('userGreeting').innerText = `🏸 ${currentUser.name}님`;
+        document.getElementById('userStudentId').innerText = `Neptun 코드: ${currentUser.student_id}`;
+        
+        const roleBadge = document.getElementById('roleBadge');
+        if (isAdmin) {
+          roleBadge.innerText = currentUser.role;
+          roleBadge.classList.remove('hidden');
+          document.getElementById('adminOpenControl').classList.remove('hidden');
+          setupWeekSelectOptions();
+        } else {
+          roleBadge.classList.add('hidden');
+        }
+
+        document.getElementById('landingPage').classList.add('hidden');
+        document.getElementById('mainPage').classList.remove('hidden');
+
+        await fetchClubSettings();
+        await fetchRegistrations(CURRENT_WEEK);
+        await checkWednesdayAutoMerge(); // 수요일 21:30 코치 지원 여부 자동 검증
+        render();
+
+      } catch (err) {
+        alert("⚠️ 시스템 오류 발생:\n" + err.message);
+      }
+    }
+
+    async function fetchClubSettings() {
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const { data, error } = await client.from('club_settings').select('*').eq('id', 1).single();
+      if (!error && data) {
+        clubSettings = data;
+        document.getElementById('adminNoticeInput').value = data.notice || '';
+      }
+    }
+
+    // 1. 수요일 21:30 기준 코치 미지원 시 초보 세션을 일반으로 자동 흡수
+    async function checkWednesdayAutoMerge() {
+      if (!clubSettings.is_lesson_week) return;
+
+      const now = new Date();
+      const wednesdayDeadline = getWednesdayDeadline(CURRENT_WEEK);
+
+      if (now >= wednesdayDeadline) {
+        const coachCount = registrations.filter(r => r.type === '코치' && r.status === '확정').length;
+
+        if (coachCount === 0) {
+          const client = getSupabaseClient();
+          if (!client) return;
+
+          await client
+            .from('registrations')
+            .update({ type: '일반' })
+            .eq('week', CURRENT_WEEK);
+
+          await client
+            .from('club_settings')
+            .update({ is_lesson_week: false })
+            .eq('id', 1);
+
+          clubSettings.is_lesson_week = false;
+          await fetchRegistrations(CURRENT_WEEK);
+        }
+      }
+    }
+
+    // 2. 관리자 수동 일괄 전환 버튼 함수
+    async function mergeToNormalSession() {
+      if (!clubSettings.is_lesson_week) {
+        alert("현재 초보 강습 세션이 활성화되어 있지 않습니다.");
+        return;
+      }
+
+      const confirmAction = confirm("코치 미지원 등으로 인해 이번 주 신청 명단(초보/코치)을 지금 즉시 '일반 세션'으로 통합 전환하시겠습니까?");
+      if (!confirmAction) return;
+
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const { error: regError } = await client
+        .from('registrations')
+        .update({ type: '일반' })
+        .eq('week', CURRENT_WEEK);
+
+      await client
+        .from('club_settings')
+        .update({ is_lesson_week: false })
+        .eq('id', 1);
+
+      if (regError) {
+        alert("전환 실패: " + regError.message);
+        return;
+      }
+
+      clubSettings.is_lesson_week = false;
+      await fetchRegistrations(CURRENT_WEEK);
+      render();
+      alert("✅ 모든 신청자가 '일반 세션'으로 즉시 전환되었습니다!");
+    }
+
+    async function toggleSessionOpen(openState) {
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const { error } = await client
+        .from('club_settings')
+        .update({ is_open: openState })
+        .eq('id', 1);
+
+      if (error) {
+        alert("상태 변경 실패: " + error.message);
+        return;
+      }
+
+      clubSettings.is_open = openState;
+      render();
+      alert(openState ? "🟢 이번 주 신청이 정상적으로 오픈되었습니다!" : "🔴 신청이 닫혔습니다 (접수 중단).");
+    }
+
+    async function toggleLessonWeek() {
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const newLessonState = !clubSettings.is_lesson_week;
+      const { error } = await client
+        .from('club_settings')
+        .update({ is_lesson_week: newLessonState })
+        .eq('id', 1);
+
+      if (error) {
+        alert("상태 변경 실패: " + error.message);
+        return;
+      }
+
+      clubSettings.is_lesson_week = newLessonState;
+      render();
+      alert(newLessonState ? "이번 주가 [초보 강습 세션 주간]으로 설정되었습니다." : "[일반 세션 주간]으로 설정되었습니다.");
+    }
+
+    async function saveNoticeMessage() {
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const newNotice = document.getElementById('adminNoticeInput').value.trim();
+      const { error } = await client
+        .from('club_settings')
+        .update({ notice: newNotice })
+        .eq('id', 1);
+
+      if (error) {
+        alert("문구 저장 실패: " + error.message);
+        return;
+      }
+
+      clubSettings.notice = newNotice;
+      render();
+      alert("안내 문구가 성공적으로 업데이트되었습니다.");
+    }
+
+    function setupWeekSelectOptions() {
+      const weekSelect = document.getElementById('weekSelect');
+      document.getElementById('weekFilterContainer').classList.remove('hidden');
+      
+      let html = '';
+      for (let i = 1; i <= CURRENT_WEEK; i++) {
+        html += `<option value="${i}" ${i === CURRENT_WEEK ? 'selected' : ''}>${i}주차 ${i === CURRENT_WEEK ? '(이번주)' : ''}</option>`;
+      }
+      weekSelect.innerHTML = html;
+    }
+
+    async function changeWeekFilter(weekVal) {
+      selectedWeek = Number(weekVal);
+      await fetchRegistrations(selectedWeek);
+      renderSettlement();
+    }
+
+    async function fetchRegistrations(weekNum) {
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const { data } = await client
+        .from('registrations')
+        .select('*')
+        .eq('week', weekNum)
+        .order('created_at', { ascending: true });
+      
+      registrations = data || [];
+    }
+
+    async function applySession() {
+      if (!clubSettings.is_open) {
+        alert(`⏳ 아직 이번 주 신청이 오픈되지 않았습니다!\n안내: ${clubSettings.notice}`);
+        return;
+      }
+
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const alreadyApplied = registrations.some(r => r.student_id.toUpperCase() === currentUser.student_id.toUpperCase());
+      if (alreadyApplied) {
+        alert('이미 이번 주 배민에 신청하셨습니다!');
+        return;
+      }
+
+      let selectedType = '일반';
+      if (clubSettings.is_lesson_week) {
+        const typeRadio = document.querySelector('input[name="applyType"]:checked');
+        if (typeRadio) selectedType = typeRadio.value;
+      }
+
+      const isConfirmed = registrations.filter(r => r.status === '확정').length < MAX_CAPACITY;
+      const status = isConfirmed ? '확정' : '대기자';
+
+      const newReg = {
+        name: currentUser.name,
+        student_id: currentUser.student_id.toUpperCase(),
+        status: status,
+        type: selectedType,
+        paid: false,
+        week: CURRENT_WEEK
+      };
+
+      await client.from('registrations').insert([newReg]);
+
+      if (isConfirmed) {
+        currentUser.count = (currentUser.count || 0) + 1;
+        await client.from('members').update({ count: currentUser.count }).eq('student_id', currentUser.student_id);
+      }
+
+      await fetchRegistrations(CURRENT_WEEK);
+      await checkWednesdayAutoMerge();
+      render();
+      alert(isConfirmed ? `${currentUser.name}님, [${selectedType}] 참석 확정되었습니다!` : `${currentUser.name}님, 정원 초과로 [대기자]로 등록되었습니다.`);
+    }
+
+    async function cancelSession(regId) {
+      const isAdmin = currentUser.role === '회장' || currentUser.role === '부회장';
+
+      if (!isAdmin && !isCancellationAllowed(CURRENT_WEEK)) {
+        alert('⏳ 목요일 밤 9시 30분 이후로는 웹에서 직접 취소할 수 없습니다.\n불참 및 대타 문의는 회장단에게 직접 연락해 주세요.');
+        return;
+      }
+
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const targetReg = registrations.find(r => r.id === regId);
+      if (!targetReg) return;
+
+      const confirmCancel = confirm(`정말로 ${targetReg.name}님의 이번 주 신청을 취소하시겠습니까?`);
+      if (!confirmCancel) return;
+
+      const wasConfirmed = targetReg.status === '확정';
+
+      await client.from('registrations').delete().eq('id', regId);
+
+      if (wasConfirmed) {
+        const { data: memberData } = await client.from('members').select('count').eq('student_id', targetReg.student_id).single();
+        if (memberData && memberData.count > 0) {
+          const newCount = Math.max(0, memberData.count - 1);
+          await client.from('members').update({ count: newCount }).eq('student_id', targetReg.student_id);
+          if (targetReg.student_id.toUpperCase() === currentUser.student_id.toUpperCase()) {
+            currentUser.count = newCount;
+          }
+        }
+
+        const waitingList = registrations.filter(r => r.id !== regId && r.status === '대기자');
+        if (waitingList.length > 0) {
+          const firstWaiting = waitingList[0];
+          
+          await client.from('registrations').update({ status: '확정' }).eq('id', firstWaiting.id);
+
+          const { data: nextMemberData } = await client.from('members').select('count').eq('student_id', firstWaiting.student_id).single();
+          const nextCount = (nextMemberData ? nextMemberData.count : 0) + 1;
+          await client.from('members').update({ count: nextCount }).eq('student_id', firstWaiting.student_id);
+          
+          if (firstWaiting.student_id.toUpperCase() === currentUser.student_id.toUpperCase()) {
+            currentUser.count = nextCount;
+          }
+
+          alert(`신청이 취소되었습니다.\n대기 1순위였던 [${firstWaiting.name}]님이 자동으로 [참석 확정]되었습니다!`);
+        } else {
+          alert('신청이 정상적으로 취소되었습니다.');
+        }
+      } else {
+        alert('대기 신청이 취소되었습니다.');
+      }
+
+      await fetchRegistrations(CURRENT_WEEK);
+      await checkWednesdayAutoMerge();
+      render();
+    }
+
+    async function togglePayment(id) {
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const isAdmin = currentUser.role === '회장' || currentUser.role === '부회장';
+      if (!isAdmin) {
+        alert('입금 확인 권한은 회장 및 부회장에게만 있습니다.');
+        return;
+      }
+
+      const target = registrations.find(r => r.id === id);
+      if (!target) return;
+
+      await client.from('registrations').update({ paid: !target.paid }).eq('id', id);
+
+      await fetchRegistrations(selectedWeek);
+      renderSettlement();
+      render();
+    }
+
+    function goToSettlementPage() {
+      document.getElementById('mainPage').classList.add('hidden');
+      document.getElementById('settlementPage').classList.remove('hidden');
+      renderSettlement();
+    }
+
+    async function goToAttendancePage() {
+      document.getElementById('mainPage').classList.add('hidden');
+      document.getElementById('attendancePage').classList.remove('hidden');
+      await renderAttendance();
+    }
+
+    function goToMainPage() {
+      document.getElementById('settlementPage').classList.add('hidden');
+      document.getElementById('attendancePage').classList.add('hidden');
+      document.getElementById('mainPage').classList.remove('hidden');
+      render();
+    }
+
+    function render() {
+      const confirmedList = registrations.filter(r => r.status === '확정');
+      const waitingList = registrations.filter(r => r.status === '대기자');
+
+      document.getElementById('confirmedCount').innerText = confirmedList.length;
+      document.getElementById('waitingCount').innerText = waitingList.length;
+      document.getElementById('progressBar').style.width = `${Math.min((confirmedList.length / MAX_CAPACITY) * 100, 100)}%`;
+
+      // 1. 회장단 컨트롤러 상태 뱃지 및 토글 텍스트 업데이트
+      const adminStatusTag = document.getElementById('adminStatusTag');
+      if (adminStatusTag) {
+        if (clubSettings.is_open) {
+          adminStatusTag.innerText = "신청 오픈 중 🟢";
+          adminStatusTag.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700";
+        } else {
+          adminStatusTag.innerText = "신청 닫힘 🔴";
+          adminStatusTag.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700";
+        }
+      }
+
+      const btnToggleLesson = document.getElementById('btnToggleLesson');
+      if (btnToggleLesson) {
+        if (clubSettings.is_lesson_week) {
+          btnToggleLesson.innerText = "활성화됨 🟢";
+          btnToggleLesson.className = "text-[11px] font-bold px-2.5 py-1 rounded-lg border transition bg-amber-500 text-white border-amber-600";
+        } else {
+          btnToggleLesson.innerText = "비활성화 상태";
+          btnToggleLesson.className = "text-[11px] font-bold px-2.5 py-1 rounded-lg border transition bg-slate-100 text-slate-600 border-slate-200";
+        }
+      }
+
+      // 2. 초보 강습 주간 UI 노출 여부
+      const lessonBanner = document.getElementById('lessonBanner');
+      const typeSelectorBox = document.getElementById('typeSelectorBox');
+      if (clubSettings.is_lesson_week) {
+        lessonBanner.classList.remove('hidden');
+        typeSelectorBox.classList.remove('hidden');
+
+        const normalCount = confirmedList.filter(r => (r.type || '일반') === '일반').length;
+        const coachCount = confirmedList.filter(r => r.type === '코치').length;
+        const lessonCount = confirmedList.filter(r => r.type === '초보').length;
+
+        document.getElementById('typeCountNormal').innerText = `${normalCount}/10명`;
+        document.getElementById('typeCountCoach').innerText = `${coachCount}/1명`;
+        document.getElementById('typeCountLesson').innerText = `${lessonCount}/3명`;
+      } else {
+        lessonBanner.classList.add('hidden');
+        typeSelectorBox.classList.add('hidden');
+      }
+
+      document.getElementById('timeNoticeText').innerText = clubSettings.is_open 
+        ? "📢 현재 신청이 오픈되었습니다! (목요일 21:30 취소 마감)" 
+        : `📢 ${clubSettings.notice || '코트 예약 확인 후 공지와 함께 오픈됩니다.'}`;
+
+      const alreadyApplied = registrations.some(r => r.student_id.toUpperCase() === currentUser.student_id.toUpperCase());
+      const applyBtn = document.getElementById('applyBtn');
+
+      if (!clubSettings.is_open) {
+        applyBtn.disabled = true;
+        applyBtn.innerText = '⏳ 신청 오픈 대기 중';
+        applyBtn.className = "w-full bg-slate-400 text-white font-bold py-3 rounded-xl transition shadow-md cursor-not-allowed";
+      } else if (alreadyApplied) {
+        applyBtn.disabled = true;
+        applyBtn.innerText = '✅ 신청 완료됨';
+        applyBtn.className = "w-full bg-slate-400 text-white font-bold py-3 rounded-xl transition shadow-md cursor-not-allowed";
+      } else {
+        applyBtn.disabled = false;
+        applyBtn.innerText = '신청하기';
+        applyBtn.className = "w-full bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold py-3 rounded-xl transition shadow-md shadow-indigo-200";
+      }
+
+      const listEl = document.getElementById('memberList');
+      if (registrations.length === 0) {
+        listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">아직 신청자가 없습니다.</p>';
+        return;
+      }
+
+      const isAdmin = currentUser.role === '회장' || currentUser.role === '부회장';
+      const isCancelTimeValid = isCancellationAllowed(CURRENT_WEEK);
+
+      listEl.innerHTML = registrations.map((r, index) => {
+        const isSelf = r.student_id.toUpperCase() === currentUser.student_id.toUpperCase();
+        const canCancel = isAdmin || (isSelf && isCancelTimeValid);
+
+        let typeBadge = '';
+        if (r.type === '코치') {
+          typeBadge = '<span class="bg-indigo-600 text-white text-[9px] px-1.5 py-0.5 rounded font-black">👑 일일코치</span>';
+        } else if (r.type === '초보') {
+          typeBadge = '<span class="bg-amber-100 text-amber-800 text-[9px] px-1.5 py-0.5 rounded font-black border border-amber-300">🐣 초보강습</span>';
+        }
+
+        return `
+          <div class="flex justify-between items-center p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-400">#${index + 1}</span>
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-slate-800">${r.name}</span>
+                  ${typeBadge}
+                </div>
+                <span class="text-[10px] text-slate-400">(${r.student_id})</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              ${r.status === '확정' 
+                ? '<span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold text-[10px]">참석확정</span>' 
+                : '<span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-bold text-[10px]">대기자</span>'}
+              ${canCancel ? `
+                <button onclick="cancelSession(${r.id})" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-2 py-0.5 rounded font-bold text-[10px] transition">
+                  취소
+                </button>
+              ` : (isSelf && !isCancelTimeValid ? `
+                <span class="text-[10px] text-slate-400 font-semibold px-1">취소마감</span>
+              ` : '')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderSettlement() {
+      const isAdmin = currentUser.role === '회장' || currentUser.role === '부회장';
+      const totalFeeInput = document.getElementById('totalFeeInput');
+      const adminNotice = document.getElementById('adminNotice');
+
+      if (isAdmin) {
+        totalFeeInput.disabled = false;
+        adminNotice.classList.remove('hidden');
+      } else {
+        totalFeeInput.disabled = true;
+        adminNotice.classList.add('hidden');
+      }
+
+      updateFee();
+
+      const confirmedList = registrations.filter(r => r.status === '확정');
+      const listEl = document.getElementById('settlementMemberList');
+
+      if (confirmedList.length === 0) {
+        listEl.innerHTML = `<p class="text-xs text-slate-400 text-center py-4">${selectedWeek}주차 참석 확정자가 없습니다.</p>`;
+        return;
+      }
+
+      listEl.innerHTML = confirmedList.map((r, index) => {
+        let typeBadge = '';
+        if (r.type === '코치') typeBadge = '<span class="text-[9px] font-bold text-indigo-600">[코치]</span>';
+        else if (r.type === '초보') typeBadge = '<span class="text-[9px] font-bold text-amber-600">[초보]</span>';
+
+        return `
+          <div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-400">#${index + 1}</span>
+              <span class="font-bold text-slate-800">${r.name}</span>
+              ${typeBadge}
+              <span class="text-[10px] text-slate-400">(${r.student_id})</span>
+            </div>
+            ${isAdmin ? `
+              <button onclick="togglePayment(${r.id})" class="px-3 py-1.5 rounded-lg font-bold transition ${r.paid ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                ${r.paid ? '입금완료 🟢' : '미입금 🔴'}
+              </button>
+            ` : `
+              <span class="px-3 py-1.5 rounded-lg font-bold ${r.paid ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}">
+                ${r.paid ? '입금완료 🟢' : '미입금 🔴'}
+              </span>
+            `}
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function renderAttendance() {
+      const client = getSupabaseClient();
+      if (!client) return;
+
+      const { data: members } = await client
+        .from('members')
+        .select('*')
+        .order('count', { ascending: false })
+        .order('name', { ascending: true });
+
+      const listEl = document.getElementById('attendanceList');
+
+      if (!members) return;
+
+      listEl.innerHTML = members.map((member, index) => {
+        const isWarning = member.count < 2;
+        let roleBadgeHtml = '';
+        
+        if (member.role === '회장') {
+          roleBadgeHtml = '<span class="bg-slate-200 text-slate-700 text-[9px] px-2 py-0.5 rounded-full font-bold">👑 회장</span>';
+        } else if (member.role === '부회장') {
+          roleBadgeHtml = '<span class="bg-slate-200 text-slate-700 text-[9px] px-2 py-0.5 rounded-full font-bold">⭐ 부회장</span>';
+        } 
+
+        return `
+          <div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+            <div class="flex items-center gap-2.5">
+              <span class="font-black text-slate-400 w-4">${index + 1}</span>
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-slate-800">${member.name}</span>
+                  ${roleBadgeHtml}
+                  ${isWarning ? '<span class="bg-rose-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-bold animate-pulse">🚨 퇴출 위험</span>' : ''}
+                </div>
+                <span class="text-[10px] text-slate-400">(${member.student_id})</span>
+              </div>
+            </div>
+            <span class="font-extrabold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">
+              누적 ${member.count || 0}회
+            </span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateFee() {
+      const total = Number(document.getElementById('totalFeeInput').value) || 0;
+      const confirmedCount = registrations.filter(r => r.status === '확정').length;
+
+      if (confirmedCount === 0) {
+        document.getElementById('feePerPerson').innerText = '0원';
+        return;
+      }
+
+      const fee = Math.ceil((total / confirmedCount) / 100) * 100;
+      document.getElementById('feePerPerson').innerText = fee.toLocaleString() + '원';
+    }
+  </script>
+</body>
+</html>
